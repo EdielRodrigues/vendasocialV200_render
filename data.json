@@ -1,0 +1,11 @@
+{
+  "products": [],
+  "campaigns": [],
+  "leads": [],
+  "sales": [],
+  "settings": {
+    "minRoas": 2,
+    "minSpend": 50,
+    "noConversionSpend": 30
+  }
+}

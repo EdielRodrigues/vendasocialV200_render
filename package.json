@@ -1,0 +1,17 @@
+{
+  "name": "vendasocial-backend",
+  "version": "10.0.0",
+  "description": "API segura do painel VendaSocial V10",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
