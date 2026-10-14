@@ -15,7 +15,7 @@ function str(v,n=180){return String(v??'').trim().slice(0,n)}
 function n(v){let x=Number(v);return Number.isFinite(x)&&x>=0?x:0}
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v)}
 function recom(){const s=db.settings||empty.settings,out=[];for(const c of db.campaigns){let spend=n(c.spend),rev=n(c.revenue),conv=n(c.conversions),roas=spend?rev/spend:0;if(spend>=n(s.noConversionSpend)&&conv===0)out.push({priority:'ATENÇÃO',title:c.name+': gasto sem conversões',message:`Investimento de ${fmt(spend)} e nenhuma conversão registrada. Confira rastreamento, público, oferta e página antes de ampliar o gasto.`});if(spend>=n(s.minSpend)&&roas<n(s.minRoas))out.push({priority:'OTIMIZAÇÃO',title:c.name+': ROAS abaixo da meta',message:`ROAS de ${roas.toFixed(2)}x, abaixo da meta de ${n(s.minRoas).toFixed(2)}x. Compare criativos, custo por conversão e margem.`});if(conv>0&&n(c.clicks)>0&&conv/n(c.clicks)>.15)out.push({priority:'DESTAQUE',title:c.name+': taxa de conversão alta',message:`Taxa registrada de ${(conv/n(c.clicks)*100).toFixed(1)}%. Identifique o que funciona antes de escalar.`})}if(!db.campaigns.length)out.push({priority:'COMECE AQUI',title:'Cadastre sua primeira campanha',message:'Informe investimento, receita, cliques e conversões para receber recomendações.'});return out.slice(0,15)}
-app.get('/health',(req,res)=>res.json({online:true,service:'VendaSocial API',version:'10.2.0',timestamp:new Date().toISOString()}));
+app.get('/health',(req,res)=>res.json({online:true,service:'VendaSocial API',version:'11.0.0',timestamp:new Date().toISOString()}));
 
 // Proteção obrigatória dos dados. Configure ADMIN_API_KEY no Render.
 const ADMIN_API_KEY=process.env.ADMIN_API_KEY||'';
@@ -34,6 +34,19 @@ function providerState(k){const p=providerSettings[k];return {provider:k,name:p.
 app.get('/api/integrations',(req,res)=>res.json(Object.keys(providerSettings).map(providerState)));
 app.get('/api/integrations/:provider',(req,res)=>{if(!providerSettings[req.params.provider])return res.status(404).json({error:'Plataforma não suportada'});res.json(providerState(req.params.provider))});
 app.post('/api/integrations/:provider/sync',(req,res)=>{if(!providerSettings[req.params.provider])return res.status(404).json({error:'Plataforma não suportada'});res.status(501).json({error:'Sincronização real ainda não ativada. É necessário implementar OAuth, permissões e chamadas oficiais da plataforma. Nenhum dado foi sincronizado.'})});
+// Acesso de redes sociais: não simular OAuth ou publicação sem credenciais e permissões.
+app.post('/api/social/connect/:provider',(req,res)=>{
+ const p=req.params.provider;
+ if(!['facebook','instagram','tiktok'].includes(p))return res.status(404).json({error:'Rede não suportada'});
+ res.status(409).json({error:'Conexão oficial ainda não configurada. É necessário cadastrar o aplicativo, callback OAuth e permissões de publicação no Meta for Developers ou TikTok for Developers. Nenhuma conta foi conectada.'});
+});
+app.get('/api/social/status',(req,res)=>res.json({facebook:{connected:false},instagram:{connected:false},tiktok:{connected:false}}));
+app.post('/api/social/publish',(req,res)=>{
+ const product=db.products.find(p=>p.id===req.body?.productId);
+ if(!product)return res.status(404).json({error:'Produto não encontrado'});
+ if(!product.buyUrl)return res.status(400).json({error:'Produto sem link de compra'});
+ res.status(409).json({error:'Publicação não enviada: conecte e autorize uma conta oficial primeiro. Use Compartilhar enquanto a integração é configurada.'});
+});
 app.get('/api/export',(req,res)=>res.json({version:10,exportedAt:new Date().toISOString(),data:db}));
 
 app.get('/api/dashboard',(req,res)=>{let spend=db.campaigns.reduce((a,c)=>a+n(c.spend),0),campaignRev=db.campaigns.reduce((a,c)=>a+n(c.revenue),0),salesRev=db.sales.reduce((a,s)=>a+n(s.amount),0);res.json({dashboard:{totalSales:db.sales.length,revenue:salesRev,attributedRevenue:campaignRev,adSpend:spend,roas:spend?campaignRev/spend:0,recommendations:recom(),weeklySales:Array.from({length:7},(_,i)=>{const day=new Date();day.setHours(0,0,0,0);day.setDate(day.getDate()-(6-i));return db.sales.filter(s=>{const dt=new Date(s.createdAt);return dt>=day&&dt<new Date(day.getTime()+86400000)}).reduce((v,s)=>v+n(s.amount),0)})}})});
